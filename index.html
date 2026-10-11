@@ -3,35 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Paste Shifter organiza tu historial de portapapeles en el Mac."
-  >
-  <title>Paste Shifter para Mac</title>
+  <meta name="theme-color" content="#08070d">
+  <meta name="description" content="Recupera lo que copiaste. Paste Shifter organiza tu historial de portapapeles, directamente en tu Mac.">
+  <title>Paste Shifter — Tu portapapeles, a otro nivel</title>
+  <link rel="icon" type="image/png" href="assets/paste-shifter-icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="home-page">
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
   <header class="shell nav">
-    <a class="brand" href="./">Paste Shifter</a>
+    <a class="brand" href="./"><img src="assets/paste-shifter-icon.png" alt="" width="38" height="38"><span>Paste Shifter</span></a>
     <nav aria-label="Navegación principal">
       <a href="privacy.html">Privacidad</a>
       <a href="support.html">Soporte</a>
+      <a class="nav-cta" href="support.html">Explorar la app <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
-  <main class="shell hero">
-    <p class="eyebrow">Una herramienta sencilla para macOS</p>
-    <h1>Tu historial de texto,<br>siempre a mano.</h1>
-    <p class="lead">Recupera lo que copiaste desde la barra de menús. Organiza tus textos en espacios Normal, Fantasma, Flash y Privado.</p>
-    <div class="callout">
-      <span class="icon" aria-hidden="true">⌘</span>
-      <p>Paste Shifter guarda el historial en tu Mac. Elige una copia para llevarla al portapapeles y pégala con <kbd>⌘V</kbd>.</p>
-    </div>
-    <div class="cards">
-      <article><h2>Normal</h2><p>Un historial temporal de los textos que copias.</p></article>
-      <article><h2>Fantasma</h2><p>Mantén ciertas copias aparte de tu historial habitual.</p></article>
-      <article><h2>Flash</h2><p>Conserva una copia de forma temporal y la elimina tras 60 segundos.</p></article>
-      <article><h2>Privado</h2><p>Guarda solo lo que eliges, cifrado localmente y protegido por macOS.</p></article>
-    </div>
-    <p class="footnote">Requiere macOS 13 o posterior. Paste Shifter no envía el contenido de tu portapapeles a un servidor.</p>
+  <main>
+    <section class="shell hero">
+      <div class="hero-copy">
+        <div class="status-pill"><span class="status-dot"></span> Hecho para macOS</div>
+        <h1>Lo que copiaste.<br><span>Siempre a mano.</span></h1>
+        <p class="lead">Un espacio para volver a encontrar tus textos. Paste Shifter mantiene tus copias organizadas y listas para pegar, sin interrumpir tu ritmo.</p>
+        <a class="hero-link" href="support.html">Conoce cómo funciona <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="visual" aria-label="Ilustración de Paste Shifter y sus espacios de historial">
+        <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+        <div class="app-icon-wrap"><img class="app-icon" src="assets/paste-shifter-icon.png" alt="Icono de Paste Shifter"></div>
+        <div class="floating-card card-top"><span class="mini-icon purple">⌘</span><span><b>Normal</b><small>Tu historial reciente</small></span><span class="card-count">08</span></div>
+        <div class="floating-card card-right"><span class="mini-icon blue">✦</span><span><b>Fantasma</b><small>Aparte del resto</small></span></div>
+        <div class="floating-card card-bottom"><span class="mini-icon pink">◷</span><span><b>Flash</b><small>Se borra en 60 s</small></span><span class="live-dot"></span></div>
+        <div class="visual-caption"><span class="caption-line"></span> Tu memoria, en órbita</div>
+      </div>
+    </section>
+    <section class="shell feature-section" id="como-funciona">
+      <div class="section-heading"><p class="eyebrow">Un lugar para cada copia</p><h2>Menos buscar.<br>Más seguir.</h2><p>Recupera el texto que necesitas y llévalo al portapapeles con un clic. Luego pégalo con <kbd>⌘V</kbd>.</p></div>
+      <div class="cards">
+        <article class="feature-card"><span class="feature-number">01 / 04</span><div class="feature-symbol purple">⌘</div><h3>Normal</h3><p>Vuelve rápidamente a los textos que copiaste hace un momento.</p></article>
+        <article class="feature-card"><span class="feature-number">02 / 04</span><div class="feature-symbol blue">✦</div><h3>Fantasma</h3><p>Guarda ciertas copias por separado para encontrarlas cuando quieras.</p></article>
+        <article class="feature-card"><span class="feature-number">03 / 04</span><div class="feature-symbol pink">◷</div><h3>Flash</h3><p>Una copia temporal que desaparece automáticamente tras 60 segundos.</p></article>
+        <article class="feature-card"><span class="feature-number">04 / 04</span><div class="feature-symbol green">◈</div><h3>Privado</h3><p>Conserva solo lo que eliges, cifrado localmente y protegido por macOS.</p></article>
+      </div>
+    </section>
+    <section class="shell privacy-band"><div class="privacy-mark">◉</div><div><p class="eyebrow">Tu Mac. Tus datos.</p><h2>El portapapeles se queda contigo.</h2><p>Paste Shifter no envía el contenido de tu portapapeles a servidores. El historial se guarda localmente en tu Mac.</p></div><a href="privacy.html">Lee nuestra política de privacidad <span aria-hidden="true">↗</span></a></section>
   </main>
-  <footer class="shell footer"><span>© 2026 Visitme SpA</span><span><a href="privacy.html">Política de privacidad</a><a href="support.html">Soporte</a></span></footer>
+  <footer class="shell footer"><span>© 2026 Visitme SpA</span><span><a href="privacy.html">Privacidad</a><a href="support.html">Soporte</a></span></footer>
 </body>
 </html>
