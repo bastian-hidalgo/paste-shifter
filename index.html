@@ -63,5 +63,24 @@
     <section class="final-section"><div class="shell final-inner"><img src="assets/paste-shifter-icon.png" width="56" height="56" alt=""><p class="eyebrow">Tu siguiente copia ya está ahí</p><h2>Vuelve a encontrar<br><em>lo que importa.</em></h2><p>Conoce cómo funciona Paste Shifter y descubre qué espacio va contigo.</p><a class="primary-button" href="support.html">Visita soporte <span aria-hidden="true">↗</span></a><span class="final-footnote">Diseñado para Mac · macOS 13 o posterior</span></div></section>
   </main>
   <footer class="shell footer"><a class="footer-brand" href="./"><img src="assets/paste-shifter-icon.png" width="28" height="28" alt=""><span>Paste Shifter</span></a><span>© 2026 Visitme SpA</span><span><a href="privacy.html">Privacidad</a><a href="support.html">Soporte</a></span></footer>
+  <script>
+    (() => {
+      if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      document.body.classList.add('motion-ready');
+      const items = document.querySelectorAll('.section-intro, .space-card, .how-heading, .steps article, .privacy-art, .privacy-copy, .final-inner');
+      items.forEach((item, index) => {
+        item.classList.add('reveal');
+        if (item.classList.contains('space-card') || item.closest('.steps')) item.style.setProperty('--reveal-delay', `${(index % 4) * 75}ms`);
+      });
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -36px 0px' });
+      items.forEach((item) => observer.observe(item));
+    })();
+  </script>
 </body>
 </html>
