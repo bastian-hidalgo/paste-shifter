@@ -1,0 +1,45 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+
+# Xcode and local user state
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM/
+
+# App bundles and release artifacts
+dist/
+*.app/
+*.xcarchive/
+*.pkg
+*.dmg
+
+# macOS noise
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Local credentials, signing material, and environment files
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+*.provisionprofile
+AuthKey_*.p8
+*.key
+*.pem
+secrets/
+credentials/
