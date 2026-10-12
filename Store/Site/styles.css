@@ -101,3 +101,11 @@ body:not(.home-page){color:var(--ink);background:radial-gradient(ellipse at 85% 
 @media(max-width:1000px){.space-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.space-card{min-height:360px}.card-settings{grid-column:auto}}
 @media(max-width:620px){.spaces-section{padding-block:70px 78px}.space-grid{grid-template-columns:minmax(0,1fr);gap:13px}.space-card{min-height:0;padding:19px}.space-card>p{min-height:0;margin-bottom:2px}.mode-art{height:clamp(108px,32vw,150px);margin-top:13px}.mode-art img{width:min(calc(100% - 24px),450px)}.settings-art{height:clamp(170px,58vw,250px)}.settings-art img{width:100%}.art-caption{margin-top:10px}.private-vault{max-width:390px}}
 @media(prefers-reduced-motion:reduce){.mode-art img,.settings-art img{transition:none!important}.vault-halo{animation:none!important}.space-card:hover .mode-art img,.space-card:hover .settings-art img{transform:none}}
+/* Privado por diseño: el icono flota en una órbita lenta, como suspendido. */
+.privacy-icon{animation:privacy-float 5.2s ease-in-out infinite;will-change:transform}
+.p-orbit-a{animation:privacy-orbit-a 24s linear infinite}
+.p-orbit-b{animation:privacy-orbit-b 32s linear infinite}
+@keyframes privacy-float{0%,100%{transform:translate3d(0,0,0) rotate(-8deg)}50%{transform:translate3d(0,-11px,0) rotate(-5deg)}}
+@keyframes privacy-orbit-a{from{transform:translate(-50%,-50%) rotate(-25deg)}to{transform:translate(-50%,-50%) rotate(335deg)}}
+@keyframes privacy-orbit-b{from{transform:translate(-50%,-50%) rotate(43deg)}to{transform:translate(-50%,-50%) rotate(-317deg)}}
+@media(prefers-reduced-motion:reduce){.privacy-icon,.p-orbit-a,.p-orbit-b{animation:none!important;will-change:auto}}
