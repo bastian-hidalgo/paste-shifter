@@ -1,3 +1,4 @@
+#if !APP_STORE
 import AppKit
 #if canImport(ClipboardCore)
 import ClipboardCore
@@ -112,3 +113,18 @@ final class GlobalScrollMonitor {
     }
     deinit { tearDown() }
 }
+#else
+import Foundation
+
+/// The Mac App Store build never listens to or filters system-wide input.
+final class GlobalScrollMonitor {
+    private(set) var isCapturing = false
+
+    @discardableResult
+    func start(onStep: @escaping (Int) -> Void, onConfirm: @escaping (CGPoint) -> Void) -> Bool {
+        false
+    }
+
+    func stop() { isCapturing = false }
+}
+#endif

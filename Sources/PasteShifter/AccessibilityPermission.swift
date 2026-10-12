@@ -3,6 +3,16 @@ import Combine
 
 /// One source of truth for the status shown in Settings and the paste monitor.
 final class AccessibilityPermission: ObservableObject {
+    #if APP_STORE
+    @Published private(set) var granted = true
+    @Published private(set) var requested = false
+    var onOpenPrivacy: (() -> Void)?
+
+    func refresh() {}
+    func request() {}
+    func openSettings() {}
+    func revealApplication() {}
+    #else
     @Published private(set) var granted = PasteService.trusted
     @Published private(set) var requested = false
     var onOpenPrivacy: (() -> Void)?
@@ -32,4 +42,5 @@ final class AccessibilityPermission: ObservableObject {
     func revealApplication() {
         NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
+    #endif
 }

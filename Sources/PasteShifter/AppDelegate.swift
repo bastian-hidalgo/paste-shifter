@@ -49,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let menu = NSMenu()
         menu.delegate = self
         add("Abrir historial", action: #selector(showHistory), to: menu)
-        add("Pegar última copia", action: #selector(quickPaste), to: menu)
+        add(Distribution.isAppStore ? "Copiar última copia" : "Pegar última copia", action: #selector(quickPaste), to: menu)
         add("Guardar portapapeles en Privado", action: #selector(saveCurrentToPrivate), to: menu)
         add("Eliminar elemento seleccionado", action: #selector(removeSelected), to: menu)
         add("Guardar copia seleccionada en Fantasma", action: #selector(saveSelectedToGhost), to: menu)
@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self, self.pickerOpen else { return event }
             if event.type == .flagsChanged {
-                self.finishReleaseSelection(modifiers: event.modifierFlags)
+                if !Distribution.isAppStore { self.finishReleaseSelection(modifiers: event.modifierFlags) }
                 return event
             }
             guard event.window === self.panel else { return event }
@@ -98,9 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
             return nil
         }
+        #if !APP_STORE
         modifierMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.finishReleaseSelection(modifiers: event.modifierFlags)
         }
+        #endif
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self, self.pickerOpen, event.window === self.panel else { return event }
             // Shift can turn a wheel gesture into horizontal scrolling.
@@ -111,10 +113,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Consume scrolling within the card; the document underneath stays still.
             return nil
         }
+        #if !APP_STORE
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.pickerOpen else { return }
             if event.type == .rightMouseDown || !self.globalScroll.isCapturing { self.dismiss(feedback: true) }
         }
+        #endif
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             if let self, self.pickerOpen, event.window !== self.panel { self.dismiss() }
             return event
@@ -239,6 +243,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     private func captureFlash() {
+        if Distribution.isAppStore {
+            guard let text = NSPasteboard.general.string(forType: .string),
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { NSSound.beep(); return }
+            store.beginFlash(text: text)
+            showHistory()
+            return
+        }
         guard let source = externalTarget() else { NSSound.beep(); return }
         target = source
         let clipboard = NSPasteboard.general
@@ -310,6 +321,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     private func updatePasteMonitor() {
+        #if APP_STORE
+        return
+        #else
         let now = ProcessInfo.processInfo.systemUptime
         guard now - lastPermissionCheck >= 2 else { return }
         lastPermissionCheck = now
@@ -329,6 +343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 self.activityIndicator.flash(.paste, target: self.externalTarget())
             }
         }
+        #endif
     }
 
     private func installApplicationMenu() {
@@ -413,7 +428,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private func showHistoryFromShortcut() {
         let wasVisible = pickerOpen
         showHistory()
-        if !wasVisible, pickerOpen, store.pasteOnRelease {
+        if !Distribution.isAppStore, !wasVisible, pickerOpen, store.pasteOnRelease {
             releaseSelection.arm()
             // Also covers a very fast release while obtaining the caret bounds.
             finishReleaseSelection(modifiers: NSEvent.modifierFlags)
@@ -421,7 +436,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     private func finishReleaseSelection(modifiers: NSEvent.ModifierFlags) {
-        guard store.pasteOnRelease, pickerOpen,
+        guard !Distribution.isAppStore, store.pasteOnRelease, pickerOpen,
               releaseSelection.commit(optionHeld: modifiers.contains(.option), shiftHeld: modifiers.contains(.shift)) else { return }
         if let clip = store.highlighted { paste(clip) } else { dismiss() }
     }
@@ -435,6 +450,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     private func paste(_ clip: Clip) {
         if CommandLine.arguments.contains("--demo") { store.select(clip); dismiss(); return }
+        if Distribution.isAppStore {
+            store.write(clip)
+            dismiss()
+            if store.showActivity { activityIndicator.flash(.copy, target: nil) }
+            return
+        }
         let destination = target
         dismiss()
         store.write(clip)
@@ -505,21 +526,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         permission.refresh()
         if settingsWindow == nil {
             let height = min(CGFloat(730), (NSScreen.main?.visibleFrame.height ?? 830) - 80)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 510, height: height), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: height), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = "Paste Shifter"; window.isReleasedWhenClosed = false
-            let hosting = NSHostingView(rootView: ScrollView {
-                SettingsView(store: store, permission: permission, loginItem: loginItem, shortcutFailures: hotKeys.failures,
-                             appIcon: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
-            })
+            window.hidesOnDeactivate = false
+            window.canHide = false
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            let hosting = NSHostingView(rootView: SettingsView(store: store, permission: permission, loginItem: loginItem, shortcutFailures: hotKeys.failures,
+                                                               appIcon: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath), windowHeight: height,
+                                                               onSwitchSpace: { [weak self] space in self?.switchSpaceFromSettings(space) }))
             // A changing SwiftUI permission section must not resize the NSWindow
             // to an invalid intrinsic size or collapse it to its title bar.
             hosting.sizingOptions = []
-            hosting.frame = NSRect(x: 0, y: 0, width: 510, height: height)
+            hosting.frame = NSRect(x: 0, y: 0, width: 1040, height: height)
             hosting.autoresizingMask = [.width, .height]
             window.contentView = hosting
             window.center(); settingsWindow = window
         }
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func switchSpaceFromSettings(_ space: ClipboardSpace) {
+        store.switchSpace(space)
+        store.prepare()
     }
 }

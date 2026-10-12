@@ -1,4 +1,25 @@
 import AppKit
+
+#if APP_STORE
+/// A Mac App Store sandbox cannot synthesize input in another application.
+/// The store build offers the selected text on the general pasteboard and the
+/// user completes the paste with the receiving app's own ⌘V command.
+enum PasteService {
+    static var trusted: Bool { true }
+
+    static func requestPermission() {}
+
+    static func paste(into target: NSRunningApplication, completion: @escaping (Bool) -> Void) {
+        completion(false)
+    }
+
+    static func copy(from target: NSRunningApplication, completion: @escaping (Bool) -> Void) {
+        completion(false)
+    }
+
+    static func caretRect(for target: NSRunningApplication?) -> CGRect? { nil }
+}
+#else
 import ApplicationServices
 
 enum PasteService {
@@ -40,7 +61,6 @@ enum PasteService {
                   let up = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: false) else {
                 completion(false); return
             }
-            // Explicit flags avoid carrying Option/Shift from the triggering shortcut.
             down.flags = .maskCommand; up.flags = .maskCommand
             down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
             completion(true)
@@ -65,8 +85,8 @@ enum PasteService {
         guard AXValueGetValue(unsafeBitCast(bounds, to: AXValue.self), .cgRect, &rect),
               rect.origin.x.isFinite, rect.origin.y.isFinite, rect.height > 0,
               let mainScreen = NSScreen.screens.first else { return nil }
-        // Accessibility coordinates originate at the main display's upper left.
         rect.origin.y = mainScreen.frame.maxY - rect.maxY
         return rect
     }
 }
+#endif
