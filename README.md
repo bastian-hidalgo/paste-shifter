@@ -1,6 +1,6 @@
 # Paste Shifter
 
-Un portapapeles de textos para macOS, escrito en Swift con AppKit y SwiftUI. Vive en la barra de menú; no abre una ventana permanente ni aparece en el Dock.
+Un gestor ligero del portapapeles para macOS, escrito en Swift con AppKit y SwiftUI, con historial rápido de texto e imágenes. Vive en la barra de menú; no abre una ventana permanente ni aparece en el Dock.
 
 ## Probar la app
 
@@ -44,6 +44,8 @@ La compilación firma y verifica un bundle nuevo con Xcode antes de sustituir el
 
 El selector es una cápsula compacta de **360 × 44 puntos**, con fondo claro en apariencia luminosa, borde fino, extremos totalmente redondeados y sombra suave. Respeta la apariencia oscura del sistema. Muestra la frase elegida y, atenuadas arriba y abajo, las frases vecinas; cada línea tiene hasta 50 caracteres. Incluye un contador como «3/8». Se pega siempre el texto completo, incluyendo espacios y saltos de línea originales. Tocar el icono del modo activo vuelve a Normal; desde Normal, el icono izquierdo abre Fantasma. El fantasma relleno junto a Enter alterna Fantasma, y en Privado aparece + para guardar el contenido actual del portapapeles.
 
+La lupa abre una búsqueda debajo de la cápsula. Al copiar una imagen o captura de pantalla, Paste Shifter crea una miniatura y la presenta en una tarjeta superpuesta; las siguientes capturas se apilan hacia la derecha, juntas y en el mismo plano. El scroll conserva el orden del historial y trae cada tarjeta al frente. En **Ajustes → Privacidad y captura** puedes detener nuevas capturas, ocultar las tarjetas sin borrar su historial o borrar las screenshots guardadas. Las imágenes se pegan desde el selector igual que los textos; Orbital sigue enviando texto y nunca comparte imágenes automáticamente.
+
 El scroll cambia de texto desde cualquier parte de la pantalla, sin desplazar el documento de abajo; se filtra la inercia para evitar saltos accidentales. Un clic izquierdo en cualquier parte de la pantalla pega la selección en el campo original, sin activar el control que hay debajo del mouse. Se consume el clic completo y se confirma al soltar el botón. También funcionan ↑ / ↓, Enter y Esc.
 
 En **Ajustes → Pegar al soltar ⌥ y ⇧** puedes activar otro modo: abre con ⌥⇧V, mantén ⌥⇧ mientras recorres las copias con el scroll y suelta ambos modificadores para pegar. Soltar solo V no confirma; puedes continuar eligiendo mientras mantengas los modificadores. Esc o un clic derecho cancela y desarma el pegado al soltar. Abrir el historial desde la barra de menú nunca activa ese modo. Por defecto está desactivado y se confirma con clic o Enter.
@@ -69,7 +71,8 @@ La app Android nativa tiene pairing por QR local, conexión directa con pinning 
 ## Recursos y privacidad
 
 - Sin cuentas, servidores, relays, analítica ni conexión a Internet en tiempo de ejecución. Orbital usa conexión directa en la Wi‑Fi local; la dependencia X.509 de Apple se incorpora durante la compilación. Sin Electron ni webviews.
-- Hasta 60 textos; máximo 256.000 bytes UTF-8 por texto. Solo texto, con sus saltos de línea y espacios originales.
+- Hasta 60 elementos por historial, entre texto e imágenes; máximo 256.000 bytes UTF-8 por texto. Se conservan saltos de línea y espacios originales.
+- Las capturas de Normal y Fantasma viven solo en memoria: hasta 12 imágenes y 24 MB combinados, con un máximo de 8 MB por imagen. Se omiten originales de más de 32 MB; la app mantiene miniaturas de hasta 520 px y reduce imágenes grandes a 2400 px si hace falta para respetar los límites. Desactivar la captura detiene el procesamiento de nuevas imágenes; ocultarlas solo cambia la vista, y el botón Borrar las elimina del historial. Las capturas desaparecen al salir y nunca se guardan en disco.
 - Normal y Fantasma viven en memoria y desaparecen al salir. Al activar Fantasma, las copias nuevas van a esa lista oculta en vez de Normal. También puedes mover allí una copia seleccionada desde el menú.
 - Privado solo agrega elementos al pulsar + o «Guardar portapapeles en Privado». Se cifra con AES-GCM; la clave aleatoria se guarda en el llavero de macOS, protegida por autenticación. Se desbloquea con Touch ID o la contraseña de la cuenta de macOS. No es un PIN propio de la app.
 - En Ajustes, Privado se bloquea automáticamente a los 5 minutos, a la hora o al cerrar la app. Al bloquearlo, limpia la copia descifrada de la sesión; el archivo cifrado sigue hasta que el usuario elija «Borrar Privado».

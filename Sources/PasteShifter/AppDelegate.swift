@@ -27,8 +27,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var keyMonitor: Any?
     private var scrollMonitor: Any?
     private var pasteMonitor: Any?
-    private var modifierMonitor: Any?
-    private var releaseSelection = ReleaseSelection()
     private var scrollSelection = ScrollSelection()
     private let globalScroll = GlobalScrollMonitor()
     private let pickerAnimator = PickerAnimator()
@@ -89,17 +87,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                                                                paste: { [weak self] clip in
             guard let self, self.pickerOpen else { return }
             self.paste(clip)
-        }))
+        },
+                                                               switchSpace: { [weak self] in self?.cycleSpace() }))
         pickerHosting.sizingOptions = []
         pickerHosting.frame = NSRect(x: 0, y: 0, width: PickerView.width, height: PickerView.height)
         panel.contentView = pickerHosting
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.pickerOpen else { return event }
-            if event.type == .flagsChanged {
-                if !Distribution.isAppStore { self.finishReleaseSelection(modifiers: event.modifierFlags) }
+            guard event.window === self.panel else { return event }
+            if self.store.searchFocused {
+                if event.keyCode == 53 {
+                    self.store.searchExpanded = false
+                    self.store.searchFocused = false
+                    self.store.query = ""
+                    return nil
+                }
                 return event
             }
-            guard event.window === self.panel else { return event }
             switch event.keyCode {
             case 125: self.store.move(1)
             case 126: self.store.move(-1)
@@ -109,11 +113,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             }
             return nil
         }
-        #if !APP_STORE
-        modifierMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.finishReleaseSelection(modifiers: event.modifierFlags)
-        }
-        #endif
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             guard let self, self.pickerOpen, event.window === self.panel else { return event }
             // Shift can turn a wheel gesture into horizontal scrolling.
@@ -127,7 +126,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         #if !APP_STORE
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.pickerOpen else { return }
-            if event.type == .rightMouseDown || !self.globalScroll.isCapturing { self.dismiss(feedback: true) }
+            if event.type == .rightMouseDown ||
+                (!self.globalScroll.isCapturing && !self.panel.frame.contains(NSEvent.mouseLocation)) {
+                self.dismiss(feedback: true)
+            }
         }
         #endif
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
@@ -408,8 +410,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
-        let origin = WidgetPlacement.nearMouse(mouse, size: CGSize(width: PickerView.bubbleWidth, height: PickerView.bubbleHeight), in: visible)
-        panel.setFrameOrigin(NSPoint(x: origin.x - PickerView.animationPadding, y: origin.y - PickerView.animationPadding))
+        let bubbleOrigin = WidgetPlacement.nearMouse(mouse, size: CGSize(width: PickerView.bubbleWidth, height: PickerView.bubbleHeight), in: visible)
+        let margin: CGFloat = 8
+        let panelX = max(visible.minX + margin, min(bubbleOrigin.x - PickerView.animationPadding,
+                                                    visible.maxX - PickerView.width - margin))
+        let panelY = max(visible.minY + margin, min(bubbleOrigin.y - PickerView.bubbleOffsetFromPanelBottom,
+                                                    visible.maxY - PickerView.height - margin))
+        panel.setFrameOrigin(NSPoint(x: panelX, y: panelY))
         pickerOpen = true
         pickerAnimator.show(panel)
         if !CommandLine.arguments.contains("--demo") {
@@ -432,25 +439,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                         self.sendWidgetSelectionToAndroid(); return
                     }
                 }
-                // Outside the two mode controls, every click pastes the selection.
-                if let clip = self.store.highlighted { self.paste(clip) } else { self.dismiss(feedback: true) }
+                // Clicks outside the widget dismiss it; Enter confirms the selection.
+                self.dismiss()
+            }, shouldPassClick: { [weak self] point in
+                guard let self, self.pickerOpen else { return false }
+                return self.panel.frame.insetBy(dx: PickerView.animationPadding,
+                                                dy: PickerView.animationPadding).contains(point)
             })
         }
         NSAccessibility.post(element: panel!, notification: .layoutChanged)
     }
 
     private func showHistoryFromShortcut() {
-        let wasVisible = pickerOpen
         showHistory()
-        if !Distribution.isAppStore, !wasVisible, pickerOpen, store.pasteOnRelease {
-            releaseSelection.arm()
-            // Also covers a very fast release while obtaining the caret bounds.
-            finishReleaseSelection(modifiers: NSEvent.modifierFlags)
-        }
     }
 
     private func sendWidgetSelectionToAndroid() {
-        guard let clip = store.highlighted,
+        guard let clip = store.highlighted, !clip.isImage,
               orbital.mayManuallyShare(space: store.space, text: clip.text) else {
             NSSound.beep()
             return
@@ -479,16 +484,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         orbital.sendManually(request.clip.text, from: store.space, to: request.deviceID)
     }
 
-    private func finishReleaseSelection(modifiers: NSEvent.ModifierFlags) {
-        guard !Distribution.isAppStore, store.pasteOnRelease, pickerOpen,
-              releaseSelection.commit(optionHeld: modifiers.contains(.option), shiftHeld: modifiers.contains(.shift)) else { return }
-        if let clip = store.highlighted { paste(clip) } else { dismiss() }
-    }
-
     @objc func quickPaste() {
         if !pickerOpen { target = externalTarget() }
         store.capture()
-        guard let clip = store.visibleHistory.latest else { showHistory(); return }
+        guard let clip = store.latestVisibleClip else { showHistory(); return }
         paste(clip)
     }
 
@@ -517,7 +516,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     func dismiss(feedback: Bool = false) {
         let wasOpen = pickerOpen
         pickerOpen = false
-        releaseSelection.cancel()
         globalScroll.stop()
         if wasOpen {
             pickerAnimator.hide(panel)

@@ -5,45 +5,134 @@ import CoreImage.CIFilterBuiltins
 #if canImport(ClipboardCore)
 import ClipboardCore
 #endif
-import Combine
 
 private let ink = Color.primary
 private let accent = Color(red: 0.52, green: 0.20, blue: 0.92)
 
-private final class PickerClock: ObservableObject {
-    @Published var now = Date()
-    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-}
-
 struct PickerView: View {
     static let bubbleWidth: CGFloat = 360
     static let bubbleHeight: CGFloat = 44
+    static let cardsHeight: CGFloat = 176
+    // Each step exposes the next card as the stack recedes toward the right.
+    static let screenshotCardWidth: CGFloat = 244
+    static let screenshotCardHeight: CGFloat = 138
+    static let screenshotCardOffsets: [CGFloat] = [0, 92, 152]
+    static let searchHeight: CGFloat = 40
+    static let itemSpacing: CGFloat = 8
     static let animationPadding: CGFloat = 24
     static let width = bubbleWidth + animationPadding * 2
-    static let height = bubbleHeight + animationPadding * 2
+    static let height = cardsHeight + bubbleHeight + searchHeight + itemSpacing * 2 + animationPadding * 2
+    static let bubbleOffsetFromPanelBottom = animationPadding + searchHeight + itemSpacing
     @ObservedObject var store: ClipboardStore
     @ObservedObject var orbital: OrbitalCoordinator
     @ObservedObject var motion: PickerMotion
     let sendToAndroid: () -> Void
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject private var clock = PickerClock()
+    @Namespace private var cardsNamespace
     let paste: (Clip) -> Void
+    let switchSpace: () -> Void
+    @FocusState private var searchFieldFocused: Bool
 
     var body: some View {
         let clips = store.filtered
         let selected = clips.firstIndex { $0.id == store.highlightedID } ?? 0
-        return HStack(spacing: 8) {
-            Group {
-                if store.space == .ghost {
-                    GhostMark(color: accent, size: 19)
+        return ZStack(alignment: .topLeading) {
+            VStack(spacing: Self.itemSpacing) {
+                screenshotStack
+                    .frame(width: Self.bubbleWidth, height: Self.cardsHeight, alignment: .bottomLeading)
+                capsule(clips: clips, selected: selected)
+                if store.searchExpanded {
+                    HStack {
+                        Spacer(minLength: 0)
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            TextField("Buscar", text: $store.query)
+                                .textFieldStyle(.plain)
+                                .focused($searchFieldFocused)
+                                .onSubmit { if let clip = store.highlighted { paste(clip) } }
+                            if !store.query.isEmpty {
+                                Button { store.query = ""; searchFieldFocused = true } label: {
+                                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(width: 260, height: Self.searchHeight)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .overlay(Capsule().strokeBorder(.primary.opacity(0.10), lineWidth: 0.75))
+                    }
+                    .frame(width: Self.bubbleWidth, height: Self.searchHeight)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 } else {
-                    Image(systemName: store.space.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(store.space == .flash ? Color.yellow : .primary.opacity(0.8))
+                    Color.clear.frame(width: Self.bubbleWidth, height: Self.searchHeight)
                 }
             }
-            .frame(width: 30, height: 30)
-            .background(.primary.opacity(0.045), in: Circle())
+            .padding(Self.animationPadding)
+        }
+        .frame(width: Self.width, height: Self.height, alignment: .topLeading)
+        .scaleEffect(motion.scale)
+        .opacity(motion.opacity)
+        // Animate layer transforms so the system compositor can move cached
+        // thumbnails smoothly without decoding full-size images per frame.
+        .animation(.interpolatingSpring(stiffness: 270, damping: 25), value: store.highlightedID)
+        .animation(.easeOut(duration: 0.18), value: store.searchExpanded)
+        .onChange(of: searchFieldFocused) { store.searchFocused = $0 }
+        .onChange(of: store.searchExpanded) { searchFieldFocused = $0 }
+        .accessibilityLabel(store.highlighted.map { "\(Distribution.isAppStore ? "Copiar" : "Pegar"): \($0.compactPreview)" } ?? "Historial vacío")
+    }
+
+    @ViewBuilder
+    private var screenshotStack: some View {
+        let cards = screenshotCards
+        if !cards.isEmpty {
+            ZStack(alignment: .topLeading) {
+                ForEach(cards, id: \.id) { clip in
+                    let index = cards.firstIndex(where: { $0.id == clip.id }) ?? 0
+                    HistoryCard(clip: clip)
+                        .frame(width: Self.screenshotCardWidth, height: Self.screenshotCardHeight)
+                        // Receding cards converge toward a vanishing point to
+                        // the right, getting smaller and fading as they go.
+                        .offset(x: Self.screenshotCardOffsets[min(index, Self.screenshotCardOffsets.count - 1)],
+                                y: 0)
+                        .scaleEffect(pow(0.84, CGFloat(index)), anchor: .center)
+                        .rotation3DEffect(.degrees(-Double(index) * 13), axis: (x: 0, y: 1, z: 0),
+                                          anchor: .center, perspective: 0.8)
+                        .opacity(pow(0.72, Double(index)))
+                        .zIndex(Double(cards.count - index))
+                        .matchedGeometryEffect(id: clip.id, in: cardsNamespace)
+                        .onTapGesture { store.highlightedID = clip.id }
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 0.96)),
+                            removal: .move(edge: .leading).combined(with: .opacity).combined(with: .scale(scale: 0.98))))
+                        .accessibilityLabel("Captura de \(clip.source), \(clip.date.formatted(date: .abbreviated, time: .shortened))")
+                }
+            }
+            .frame(width: Self.bubbleWidth, height: Self.cardsHeight, alignment: .bottomLeading)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else {
+            Color.clear
+        }
+    }
+
+    private func capsule(clips: [Clip], selected: Int) -> some View {
+        HStack(spacing: 8) {
+            Button(action: switchSpace) {
+                Group {
+                    if store.space == .ghost {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(accent)
+                    } else {
+                        Image(systemName: store.space.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(store.space == .flash ? Color.yellow : .primary.opacity(0.8))
+                    }
+                }
+                .frame(width: 28, height: 28)
+                .background(.primary.opacity(0.045), in: Circle())
+            }
+            .buttonStyle(.plain)
             .help("Cambiar espacio")
             VStack(alignment: .leading, spacing: 0) {
                 if selected > 0 {
@@ -66,15 +155,13 @@ struct PickerView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if Distribution.isAppStore, let clip = store.highlighted { paste(clip) }
-            }
-            .help(Distribution.isAppStore ? "Clic para copiar; después pulsa ⌘V en la app de destino." : "")
+            .help(Distribution.isAppStore ? "Pulsa Enter para copiar; después pulsa ⌘V en la app de destino." : "Pulsa Enter para pegar la copia seleccionada.")
             if store.space == .flash, store.showFlashTimer, let expiry = store.flashExpiresAt {
-                Text("\(max(0, Int(expiry.timeIntervalSince(clock.now).rounded(.up))))s")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(.yellow)
-                    .frame(minWidth: 24)
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("\(max(0, Int(expiry.timeIntervalSince(context.date).rounded(.up))))s")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(.yellow)
+                        .frame(minWidth: 24)
+                }
             }
             if let clip = store.highlighted,
                let index = store.filtered.firstIndex(where: { $0.id == clip.id }) {
@@ -83,25 +170,52 @@ struct PickerView: View {
                     .font(.system(size: 10, design: .monospaced)).monospacedDigit()
                     .foregroundStyle(.secondary)
                 Image(systemName: "return")
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(accent)
                     .frame(width: 27, height: 27)
-                    .background(Color.purple.opacity(0.62), in: Circle())
+                    .background(accent.opacity(0.10), in: Circle())
+                    .help(Distribution.isAppStore ? "Pulsa Enter para copiar" : "Pulsa Enter para pegar")
+                    .accessibilityLabel(Distribution.isAppStore ? "Pulsa Enter para copiar" : "Pulsa Enter para pegar")
             }
             if store.space == .privateSession {
-                Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary).frame(width: 18, height: 26).help("Guardar el portapapeles en Privado")
+                Button(action: store.saveCurrentToPrivate) {
+                    Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary).frame(width: 18, height: 26)
+                }
+                .buttonStyle(.plain).help("Guardar el portapapeles en Privado")
             }
             Button(action: sendToAndroid) {
-                OrbitalMark(size: 23, isActive: canSendHighlightedToAndroid)
-                    .frame(width: 26, height: 26)
+                OrbitalMark(size: 17, isActive: canSendHighlightedToAndroid)
+                    .frame(width: 28, height: 28)
+                    .background(.primary.opacity(0.045), in: Circle())
             }
             .buttonStyle(.plain)
-        .help(orbital.pairedDevices.count == 1
-              ? "Enviar la copia seleccionada a \(orbital.pairedDevices[0].name)"
-              : "Enviar la copia seleccionada a Android por Orbital")
+            .help(orbital.pairedDevices.count == 1
+                  ? "Enviar la copia seleccionada a \(orbital.pairedDevices[0].name)"
+                  : "Enviar la copia seleccionada a Android por Orbital")
             .accessibilityLabel("Enviar a Android por Orbital")
+            Button {
+                if store.searchExpanded {
+                    store.searchExpanded = false
+                    store.searchFocused = false
+                    searchFieldFocused = false
+                    store.query = ""
+                } else {
+                    store.searchExpanded = true
+                    searchFieldFocused = true
+                }
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(store.searchExpanded ? accent : .secondary)
+                    .frame(width: 28, height: 28)
+                    .background(.primary.opacity(0.045), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Buscar en el historial")
+            .accessibilityLabel("Buscar en el historial")
         }
-        .padding(.horizontal, 8).frame(width: Self.bubbleWidth, height: Self.bubbleHeight)
+        .padding(.horizontal, 8)
+        .frame(width: Self.bubbleWidth, height: Self.bubbleHeight)
         .contentShape(Capsule())
         .background {
             Capsule().fill(.ultraThinMaterial)
@@ -117,16 +231,22 @@ struct PickerView: View {
         .overlay(Capsule().strokeBorder(.primary.opacity(0.10), lineWidth: 0.75))
         .overlay(Capsule().inset(by: 1).strokeBorder(.white.opacity(colorScheme == .dark ? 0.08 : 0.95), lineWidth: 0.75))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 7, x: 0, y: 3)
-        .scaleEffect(motion.scale)
-        .opacity(motion.opacity)
-        .padding(Self.animationPadding)
-        .animation(.snappy(duration: 0.16), value: store.highlightedID)
-        .onReceive(clock.timer) { clock.now = $0 }
-        .accessibilityLabel(store.highlighted.map { "\(Distribution.isAppStore ? "Copiar" : "Pegar"): \($0.compactPreview)" } ?? "Historial vacío")
+    }
+
+    private var screenshotCards: [Clip] {
+        let clips = store.filtered
+        guard !clips.isEmpty else { return [] }
+        let selectedIndex = clips.firstIndex { $0.id == store.highlightedID } ?? 0
+        var cards = [clips[selectedIndex]]
+        cards.append(contentsOf: clips.dropFirst(selectedIndex + 1).prefix(2))
+        if cards.count < 3, selectedIndex > 0 {
+            cards.append(contentsOf: clips[..<selectedIndex].suffix(3 - cards.count))
+        }
+        return cards
     }
 
     private var canSendHighlightedToAndroid: Bool {
-        guard let clip = store.highlighted else { return false }
+        guard let clip = store.highlighted, !clip.isImage else { return false }
         return orbital.mayManuallyShare(space: store.space, text: clip.text)
     }
 
@@ -138,6 +258,124 @@ struct PickerView: View {
         case .privateSession: "Aún no hay copias privadas"
         }
     }
+}
+
+private struct HistoryCard: View {
+    private static let cardWidth: CGFloat = 240
+    private static let previewHeight: CGFloat = 109
+    private static let previewCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 3
+        cache.totalCostLimit = 4 * 1_024 * 1_024
+        return cache
+    }()
+    private static let appIconCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 48
+        return cache
+    }()
+    let clip: Clip
+    @State private var preview: NSImage?
+    private let sourceAppIcon: NSImage?
+
+    init(clip: Clip) {
+        self.clip = clip
+        if let bundleID = clip.sourceBundleID {
+            let key = bundleID as NSString
+            if let cached = Self.appIconCache.object(forKey: key) {
+                sourceAppIcon = cached
+            } else if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                let icon = NSWorkspace.shared.icon(forFile: appURL.path)
+                Self.appIconCache.setObject(icon, forKey: key)
+                sourceAppIcon = icon
+            } else {
+                sourceAppIcon = nil
+            }
+        } else {
+            sourceAppIcon = nil
+        }
+        let key = clip.id.uuidString as NSString
+        if let cached = Self.previewCache.object(forKey: key) {
+            _preview = State(initialValue: cached)
+        } else if let data = clip.linkImage ?? clip.imageThumbnail, let image = NSImage(data: data) {
+            Self.previewCache.setObject(image, forKey: key, cost: data.count)
+            _preview = State(initialValue: image)
+        } else {
+            _preview = State(initialValue: nil)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 7) {
+                if let sourceAppIcon {
+                    Image(nsImage: sourceAppIcon).resizable().frame(width: 14, height: 14).clipShape(RoundedRectangle(cornerRadius: 3))
+                } else {
+                    Image(systemName: symbol).font(.system(size: 10, weight: .semibold)).foregroundStyle(accent)
+                }
+                Text(kind).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                Spacer(minLength: 4)
+                Text(clip.date, style: .time)
+                    .font(.system(size: 9, design: .rounded)).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10).frame(height: 29)
+            if let image = preview {
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: Self.cardWidth, height: clip.isLink ? 82 : Self.previewHeight)
+                    .clipped()
+                if clip.isLink {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(clip.linkTitle ?? linkHost).font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                        Text(linkHost).font(.system(size: 9)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .padding(.horizontal, 9).frame(maxWidth: .infinity, minHeight: 27, alignment: .leading)
+                    .background(.regularMaterial)
+                }
+            } else if clip.isLink {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(clip.linkTitle ?? linkHost).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                    Text(linkHost).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .padding(10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else if clip.isFile {
+                Label(clip.fileName ?? "Archivo", systemImage: clip.isImageFile ? "photo" : "doc")
+                    .font(.system(size: 12, weight: .medium)).lineLimit(2).padding(10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else {
+                Text(clip.compactPreview).font(.system(size: 11, weight: .medium)).lineLimit(5)
+                    .padding(10).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(.white.opacity(0.85), lineWidth: 1))
+        .shadow(color: .black.opacity(0.16), radius: 12, x: 0, y: 6)
+        .onChange(of: clip.linkImage) { data in
+            guard let data, let image = NSImage(data: data) else { return }
+            preview = image
+            Self.previewCache.setObject(image, forKey: clip.id.uuidString as NSString, cost: data.count)
+        }
+    }
+
+    private var kind: String {
+        if clip.isImageFile { return "Imagen" }
+        if clip.isFile { return "Archivo" }
+        if clip.isImage { return "Imagen" }
+        if clip.isLink { return "Link" }
+        return "Texto"
+    }
+
+    private var symbol: String {
+        if clip.isImageFile { return "photo" }
+        if clip.isFile { return "doc" }
+        if clip.isImage { return "photo" }
+        if clip.isLink { return "link" }
+        return "text.alignleft"
+    }
+
+    private var linkHost: String { URL(string: clip.linkURL ?? "")?.host ?? clip.linkURL ?? "Enlace" }
 }
 
 private struct GhostMark: View {
@@ -256,10 +494,7 @@ struct SettingsView: View {
                              : "Guarda la selección activa por 60 segundos.")
                 }.padding(16).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
                 if !Distribution.isAppStore {
-                    settingsToggle("Pegar al soltar ⌥ y ⇧", isOn: $store.pasteOnRelease)
-                    Text(store.pasteOnRelease
-                         ? "Mantén ⌥⇧ al abrir el historial, elige con el scroll y suelta ambos modificadores para pegar. Esc cancela."
-                         : "Elige con el scroll y haz clic para pegar. También puedes usar Enter.")
+                    Text("Elige con el scroll o haz clic en una card para seleccionarla; pulsa Enter para pegar. Hacer clic fuera cierra el widget.")
                         .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -271,14 +506,24 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 10) {
                 sectionHeading("Privacidad y captura")
                 VStack(alignment: .leading, spacing: 7) {
+                    settingsToggle("Conservar historial local entre aperturas", isOn: $store.keepClipboardHistory)
                     settingsToggle("Pausar captura del portapapeles", isOn: $store.paused)
                     settingsToggle("Sonido al activar Privado", isOn: $store.privateSoundEnabled)
                     settingsToggle("Sonido spooky al activar Fantasma", isOn: $store.ghostSoundEnabled)
                     settingsToggle("Sonido al activar Flash", isOn: $store.flashSoundEnabled)
                     settingsToggle("Mostrar contador de Flash", isOn: $store.showFlashTimer)
+                    settingsToggle("Capturar imágenes del portapapeles", isOn: $store.captureScreenshots)
+                    settingsToggle("Mostrar screenshots en el widget", isOn: $store.showScreenshots)
+                    Button(role: .destructive) { store.clearScreenshots() } label: {
+                        Label("Borrar screenshots guardadas (\(store.screenshotCount))", systemImage: "trash")
+                    }
+                    .controlSize(.small)
+                    .disabled(store.screenshotCount == 0)
                     settingsToggle(Distribution.isAppStore ? "Mostrar indicador al copiar" : "Mostrar LED al copiar y pegar", isOn: $store.showActivity)
                 }
-                Text("Privado se bloquea al cambiar de espacio y vuelve a pedir autenticación cuando ingresas. Flash elimina su copia al minuto si aún está en el portapapeles.")
+                Text("El historial Normal y Fantasma se guarda solo en este Mac, con acceso restringido a tu usuario; no se sincroniza con iCloud. Puedes desactivar la conservación para borrar el archivo local. Imágenes y miniaturas se procesan en segundo plano y tienen un límite conjunto de 12 elementos y 24 MB; los originales mayores de 32 MB se omiten y los demás se reducen si hace falta.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("Privado se bloquea al cambiar de espacio y vuelve a pedir autenticación cuando ingresas. Flash elimina su copia al minuto si aún está en el portapapeles. Las vistas previas de links se obtienen desde el sitio al copiar la URL.")
                     .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if store.space == .privateSession, let error = store.privateError, !store.privateUnlocked {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
@@ -356,7 +601,7 @@ struct SettingsView: View {
                     clearButton("Privado", space: .privateSession)
                 }
                 HStack {
-                    Text("El historial Normal vive solo en memoria y se vacía al cerrar la app.")
+                    Text("Normal y Fantasma se guardan localmente entre aperturas si la conservación está activada.")
                         .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
                     Button("Vaciar Normal", role: .destructive) { store.clear() }.controlSize(.small)

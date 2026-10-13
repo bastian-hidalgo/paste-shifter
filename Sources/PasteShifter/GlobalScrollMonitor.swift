@@ -12,15 +12,17 @@ final class GlobalScrollMonitor {
     private var capture = ScrollCapture()
     private var onStep: ((Int) -> Void)?
     private var onConfirm: ((CGPoint) -> Void)?
+    private var shouldPassClick: ((CGPoint) -> Bool)?
     private var clickCapture = PickerClickCapture()
     private var generation = 0
     private(set) var isCapturing = false
 
     @discardableResult
-    func start(onStep: @escaping (Int) -> Void, onConfirm: @escaping (CGPoint) -> Void) -> Bool {
+    func start(onStep: @escaping (Int) -> Void, onConfirm: @escaping (CGPoint) -> Void,
+               shouldPassClick: ((CGPoint) -> Bool)? = nil) -> Bool {
         stop()
         guard PasteService.trusted else { return false }
-        self.onStep = onStep; self.onConfirm = onConfirm
+        self.onStep = onStep; self.onConfirm = onConfirm; self.shouldPassClick = shouldPassClick
         // Reuse a tap that is still swallowing the release of a cancelled click.
         if let tap, CGEvent.tapIsEnabled(tap: tap) {
             capture.begin(); clickCapture.begin(); isCapturing = true
@@ -66,6 +68,9 @@ final class GlobalScrollMonitor {
         default: clickKind = nil
         }
         if let clickKind {
+            if case .down = clickKind, shouldPassClick?(NSEvent.mouseLocation) == true {
+                return Unmanaged.passUnretained(event)
+            }
             switch clickCapture.handle(clickKind) {
             case .passThrough: return Unmanaged.passUnretained(event)
             case .consumed(let confirm):
@@ -101,7 +106,7 @@ final class GlobalScrollMonitor {
     func stop() {
         generation += 1
         capture.end(); clickCapture.end(); isCapturing = false
-        onStep = nil; onConfirm = nil
+        onStep = nil; onConfirm = nil; shouldPassClick = nil
         if !clickCapture.isTracking { tearDown() }
     }
 
@@ -121,7 +126,8 @@ final class GlobalScrollMonitor {
     private(set) var isCapturing = false
 
     @discardableResult
-    func start(onStep: @escaping (Int) -> Void, onConfirm: @escaping (CGPoint) -> Void) -> Bool {
+    func start(onStep: @escaping (Int) -> Void, onConfirm: @escaping (CGPoint) -> Void,
+               shouldPassClick: ((CGPoint) -> Bool)? = nil) -> Bool {
         false
     }
 
