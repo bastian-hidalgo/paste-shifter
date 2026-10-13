@@ -43,6 +43,7 @@ final class ClipboardStore: ObservableObject {
         didSet { UserDefaults.standard.set(showFlashTimer, forKey: "showFlashTimer") }
     }
     var onCopy: (() -> Void)?
+    var onNormalClipInserted: ((String) -> Void)?
     var onTick: (() -> Void)?
     @Published var query = ""
     @Published var highlightedID: UUID?
@@ -108,7 +109,10 @@ final class ClipboardStore: ObservableObject {
         let source = NSWorkspace.shared.frontmostApplication?.localizedName ?? "Portapapeles"
         switch space {
         case .normal:
-            if history.insert(text, source: source), notify { onCopy?() }
+            if history.insert(text, source: source) {
+                onNormalClipInserted?(text)
+                if notify { onCopy?() }
+            }
         case .ghost:
             if ghostHistory.insert(text, source: source), notify { onCopy?() }
         case .flash, .privateSession:
@@ -139,6 +143,20 @@ final class ClipboardStore: ObservableObject {
         NSPasteboard.general.setString(clip.text, forType: .string)
         changeCount = NSPasteboard.general.changeCount
         if space == .flash { flashClipboardChangeCount = changeCount }
+    }
+
+    /// Adds an authenticated Orbital transfer to Normal and makes it the
+    /// system clipboard so the next paste works across devices. Updating the
+    /// observed change count prevents importing it again or echoing it back.
+    @discardableResult
+    func insertOrbitalClip(_ text: String, source: String) -> Bool {
+        guard text.utf8.count <= OrbitalClipEnvelope.maximumUTF8Bytes,
+              history.insert(text, source: "Orbital · \(source)") else { return false }
+        if space == .normal { highlightedID = history.latest?.id }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        changeCount = NSPasteboard.general.changeCount
+        return true
     }
     func clear() {
         switch space {

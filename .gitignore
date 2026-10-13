@@ -3,10 +3,12 @@
 .swiftpm/
 Packages/
 Package.resolved
+!Package.resolved
 
 # Xcode and local user state
 DerivedData/
 build/
+**/.gradle/
 *.xcuserstate
 xcuserdata/
 *.xccheckout

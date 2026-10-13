@@ -12,6 +12,7 @@
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			mainGroup = A10000000000000000000003;
+			packageReferences = (B20000000000000000000001, B20000000000000000000002);
 			productRefGroup = A10000000000000000000004;
 			projectDirPath = "";
 			projectRoot = "";
@@ -50,6 +51,10 @@
 				A10000000000000000000049 /* BrandIcon.swift */, A1000000000000000000004A /* ClipboardStore.swift */, A1000000000000000000004B /* GlobalScrollMonitor.swift */,
 				A1000000000000000000004C /* HotKeys.swift */, A1000000000000000000004D /* LoginItemSettings.swift */, A1000000000000000000004E /* PasteService.swift */,
 				A1000000000000000000004F /* PickerAnimator.swift */, A10000000000000000000050 /* PickerView.swift */, A10000000000000000000051 /* PrivateVault.swift */, A10000000000000000000052 /* main.swift */, A10000000000000000000087 /* Distribution.swift */,
+				A10000000000000000000089 /* Orbital.swift */,
+				A10000000000000000000091 /* OrbitalIdentity.swift */,
+				A10000000000000000000093 /* OrbitalHandshake.swift */,
+				A10000000000000000000095 /* OrbitalTransport.swift */,
 			);
 			path = PasteShifter; sourceTree = "<group>";
 		};
@@ -80,6 +85,10 @@
 		A10000000000000000000051 /* PrivateVault.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateVault.swift; sourceTree = "<group>"; };
 		A10000000000000000000052 /* main.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A10000000000000000000087 /* Distribution.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Distribution.swift; sourceTree = "<group>"; };
+		A10000000000000000000089 /* Orbital.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Orbital.swift; sourceTree = "<group>"; };
+		A10000000000000000000091 /* OrbitalIdentity.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalIdentity.swift; sourceTree = "<group>"; };
+		A10000000000000000000093 /* OrbitalHandshake.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalHandshake.swift; sourceTree = "<group>"; };
+		A10000000000000000000095 /* OrbitalTransport.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitalTransport.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* Paste Shifter.app */ = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Paste Shifter.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000010 /* PasteShifter */ = {
 			isa = PBXNativeTarget;
@@ -90,16 +99,17 @@
 			name = PasteShifter;
 			productName = "Paste Shifter";
 			productReference = A10000000000000000000011;
+			packageProductDependencies = (B20000000000000000000011, B20000000000000000000012);
 			productType = "com.apple.product-type.application";
 		};
 		A10000000000000000000013 /* Sources */ = {
 			isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
 				A10000000000000000000060, A10000000000000000000061, A10000000000000000000062, A10000000000000000000063, A10000000000000000000064, A10000000000000000000065,
 				A10000000000000000000066, A10000000000000000000067, A10000000000000000000068, A10000000000000000000069, A1000000000000000000006A, A1000000000000000000006B,
-				A1000000000000000000006C, A1000000000000000000006D, A1000000000000000000006E, A1000000000000000000006F, A10000000000000000000070, A10000000000000000000071, A10000000000000000000072, A10000000000000000000088,
+				A1000000000000000000006C, A1000000000000000000006D, A1000000000000000000006E, A1000000000000000000006F, A10000000000000000000070, A10000000000000000000071, A10000000000000000000072, A10000000000000000000088, A10000000000000000000090, A10000000000000000000092, A10000000000000000000094, A10000000000000000000096,
 			);
 		};
-		A10000000000000000000014 /* Frameworks */ = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); };
+		A10000000000000000000014 /* Frameworks */ = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000021, B20000000000000000000022); };
 		A10000000000000000000015 /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000075, A10000000000000000000076); };
 		A10000000000000000000016 /* Make app icon */ = {
 			isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647; files = (); inputPaths = ("$(SRCROOT)/Resources/MakeIcon.swift", "$(SRCROOT)/Resources/AppIcon-Purple.png"); outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/AppIcon.icns");
@@ -127,6 +137,12 @@
 		A10000000000000000000071 = { isa = PBXBuildFile; fileRef = A10000000000000000000051; };
 		A10000000000000000000072 = { isa = PBXBuildFile; fileRef = A10000000000000000000052; };
 		A10000000000000000000088 = { isa = PBXBuildFile; fileRef = A10000000000000000000087; };
+		A10000000000000000000090 = { isa = PBXBuildFile; fileRef = A10000000000000000000089; };
+		A10000000000000000000092 = { isa = PBXBuildFile; fileRef = A10000000000000000000091; };
+		A10000000000000000000094 = { isa = PBXBuildFile; fileRef = A10000000000000000000093; };
+		A10000000000000000000096 = { isa = PBXBuildFile; fileRef = A10000000000000000000095; };
+		B20000000000000000000021 = { isa = PBXBuildFile; productRef = B20000000000000000000011; };
+		B20000000000000000000022 = { isa = PBXBuildFile; productRef = B20000000000000000000012; };
 		A10000000000000000000075 /* malarbrush-camera-flash-204151.mp3 in Resources */ = { isa = PBXBuildFile; fileRef = A10000000000000000000073; };
 		A10000000000000000000076 /* eaglaxle-switching-button-3-461630.mp3 in Resources */ = { isa = PBXBuildFile; fileRef = A10000000000000000000074; };
 		A10000000000000000000080 = { isa = XCBuildConfiguration; buildSettings = { CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = BJ345NMP76; MACOSX_DEPLOYMENT_TARGET = 13.0; SDKROOT = macosx; SWIFT_VERSION = 5.9; }; name = Debug; };
@@ -148,6 +164,10 @@
 				MACOSX_DEPLOYMENT_TARGET = 13.0; PRODUCT_BUNDLE_IDENTIFIER = cl.pasteshifter.app; PRODUCT_NAME = "Paste Shifter";
 				EXECUTABLE_NAME = PasteShifter; SDKROOT = macosx; SWIFT_VERSION = 5.9; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
 			}; name = AppStore; };
+		B20000000000000000000001 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/apple/swift-certificates.git"; requirement = { kind = upToNextMajorVersion; minimumVersion = 1.0.0; }; };
+		B20000000000000000000002 = { isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/apple/swift-crypto.git"; requirement = { kind = upToNextMajorVersion; minimumVersion = 3.12.3; }; };
+		B20000000000000000000011 = { isa = XCSwiftPackageProductDependency; package = B20000000000000000000001; productName = X509; };
+		B20000000000000000000012 = { isa = XCSwiftPackageProductDependency; package = B20000000000000000000002; productName = Crypto; };
 		A10000000000000000000002 = { isa = XCConfigurationList; buildConfigurations = (A10000000000000000000080, A10000000000000000000081, A10000000000000000000084); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		A10000000000000000000012 = { isa = XCConfigurationList; buildConfigurations = (A10000000000000000000082, A10000000000000000000083, A10000000000000000000085); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 	};

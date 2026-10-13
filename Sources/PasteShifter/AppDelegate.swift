@@ -10,7 +10,14 @@ final class PickerPanel: NSPanel {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+    private final class OrbitalSendRequest: NSObject {
+        let clip: Clip
+        let deviceID: UUID
+        init(clip: Clip, deviceID: UUID) { self.clip = clip; self.deviceID = deviceID }
+    }
+
     let store = ClipboardStore()
+    let orbital = OrbitalCoordinator()
     private let permission = AccessibilityPermission()
     private let loginItem = LoginItemSettings()
     private let hotKeys = HotKeys()
@@ -42,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         permission.onOpenPrivacy = { [weak self] in self?.returningFromPrivacy = true }
+        orbital.configure(store: store)
         installApplicationMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         updateModeStatus()
@@ -75,7 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         panel.hidesOnDeactivate = false; panel.becomesKeyOnlyIfNeeded = false
         panel.isReleasedWhenClosed = false; panel.delegate = self
         panel.title = "Historial — Paste Shifter"
-        let pickerHosting = NSHostingView(rootView: PickerView(store: store, motion: pickerAnimator.motion, paste: { [weak self] clip in
+        let pickerHosting = NSHostingView(rootView: PickerView(store: store, orbital: orbital,
+                                                               motion: pickerAnimator.motion,
+                                                               sendToAndroid: { [weak self] in self?.sendWidgetSelectionToAndroid() },
+                                                               paste: { [weak self] clip in
             guard let self, self.pickerOpen else { return }
             self.paste(clip)
         }))
@@ -308,7 +319,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { store.prepareToQuit() }
+    func applicationWillTerminate(_ notification: Notification) {
+        orbital.endPairing()
+        orbital.transportShutdown()
+        store.prepareToQuit()
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { showSettings() }
@@ -409,13 +424,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     if localX < 42 {
                         self.cycleSpace(); return
                     }
-                    if localX > PickerView.bubbleWidth - 20 {
-                        self.store.switchSpace(self.store.space == .ghost ? .normal : .ghost)
-                        return
-                    }
                     if self.store.space == .privateSession,
                        localX > PickerView.bubbleWidth - 57, localX < PickerView.bubbleWidth - 25 {
                         self.store.saveCurrentToPrivate(); return
+                    }
+                    if localX > PickerView.bubbleWidth - 22 {
+                        self.sendWidgetSelectionToAndroid(); return
                     }
                 }
                 // Outside the two mode controls, every click pastes the selection.
@@ -433,6 +447,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             // Also covers a very fast release while obtaining the caret bounds.
             finishReleaseSelection(modifiers: NSEvent.modifierFlags)
         }
+    }
+
+    private func sendWidgetSelectionToAndroid() {
+        guard let clip = store.highlighted,
+              orbital.mayManuallyShare(space: store.space, text: clip.text) else {
+            NSSound.beep()
+            return
+        }
+        let devices = orbital.pairedDevices
+        guard !devices.isEmpty else { NSSound.beep(); return }
+        if devices.count == 1, let device = devices.first {
+            orbital.sendManually(clip.text, from: store.space, to: device.id)
+            return
+        }
+        let menu = NSMenu()
+        for device in devices {
+            let item = NSMenuItem(title: device.name, action: #selector(sendWidgetClipToDevice(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = OrbitalSendRequest(clip: clip, deviceID: device.id)
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil,
+                   at: NSPoint(x: PickerView.animationPadding + PickerView.bubbleWidth - 8,
+                               y: PickerView.animationPadding + PickerView.bubbleHeight - 8),
+                   in: panel.contentView)
+    }
+
+    @objc private func sendWidgetClipToDevice(_ sender: NSMenuItem) {
+        guard let request = sender.representedObject as? OrbitalSendRequest else { return }
+        orbital.sendManually(request.clip.text, from: store.space, to: request.deviceID)
     }
 
     private func finishReleaseSelection(modifiers: NSEvent.ModifierFlags) {
@@ -532,7 +576,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             window.canHide = false
             window.level = .floating
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            let hosting = NSHostingView(rootView: SettingsView(store: store, permission: permission, loginItem: loginItem, shortcutFailures: hotKeys.failures,
+            let hosting = NSHostingView(rootView: SettingsView(store: store, orbital: orbital, permission: permission, loginItem: loginItem, shortcutFailures: hotKeys.failures,
                                                                appIcon: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath), windowHeight: height,
                                                                onSwitchSpace: { [weak self] space in self?.switchSpaceFromSettings(space) }))
             // A changing SwiftUI permission section must not resize the NSWindow

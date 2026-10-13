@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pasteshifter:orbital:clip-envelope:v1",
+  "title": "Orbital clip envelope v1",
+  "description": "Application message carried only inside an authenticated, encrypted Orbital session. This schema does not authenticate a sender or secure transport.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "clipID",
+    "originDeviceID",
+    "originDeviceName",
+    "text",
+    "createdAtMilliseconds"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "clipID": { "type": "string", "format": "uuid" },
+    "originDeviceID": { "type": "string", "format": "uuid" },
+    "originDeviceName": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "text": { "type": "string", "minLength": 1, "description": "UTF-8 encoding must be at most 256000 bytes; reject whitespace-only strings." },
+    "createdAtMilliseconds": { "type": "integer", "minimum": 0, "description": "Unix epoch milliseconds." }
+  }
+}

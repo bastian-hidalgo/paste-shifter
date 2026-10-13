@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pasteshifter:orbital:handshake-v1",
+  "title": "Orbital authenticated connection handshake v1",
+  "description": "Every object is one TLS-protected length-prefixed JSON frame. No clip frame is accepted before an accepted message is sent.",
+  "oneOf": [
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "deviceID", "deviceName", "signingPublicKeyX963", "clientNonce"],
+      "properties": {
+        "version": { "const": 1 },
+        "messageType": { "const": "hello" },
+        "deviceID": { "type": "string", "format": "uuid" },
+        "deviceName": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "signingPublicKeyX963": { "type": "string", "contentEncoding": "base64", "minLength": 88, "maxLength": 88 },
+        "clientNonce": { "type": "string", "contentEncoding": "base64", "minLength": 44, "maxLength": 44 },
+        "pairingID": { "type": "string", "format": "uuid" }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "localDeviceID", "serverNonce"],
+      "properties": {
+        "version": { "const": 1 }, "messageType": { "const": "challenge" },
+        "localDeviceID": { "type": "string", "format": "uuid" },
+        "serverNonce": { "type": "string", "contentEncoding": "base64", "minLength": 44, "maxLength": 44 }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "pairingID", "proofHMACSHA256"],
+      "properties": {
+        "version": { "const": 1 }, "messageType": { "const": "pair-proof" },
+        "pairingID": { "type": "string", "format": "uuid" },
+        "proofHMACSHA256": { "type": "string", "contentEncoding": "base64", "minLength": 44, "maxLength": 44 }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "signatureDER"],
+      "properties": {
+        "version": { "const": 1 }, "messageType": { "const": "device-proof" },
+        "signatureDER": { "type": "string", "contentEncoding": "base64", "minLength": 80, "maxLength": 100 }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "comparisonCode"],
+      "properties": {
+        "version": { "const": 1 }, "messageType": { "const": "approval-needed" },
+        "comparisonCode": { "type": "string", "pattern": "^[0-9]{6}$" }
+      }
+    },
+    {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "messageType", "deviceID"],
+      "properties": {
+        "version": { "const": 1 },
+        "messageType": { "enum": ["accepted", "rejected"] },
+        "deviceID": { "type": "string", "format": "uuid" }
+      }
+    }
+  ]
+}

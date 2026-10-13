@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 enum BrandIcon {
     static let ghost: NSImage = {
@@ -57,4 +58,48 @@ enum BrandIcon {
         image.accessibilityDescription = "Paste Shifter"
         return image
     }()
+}
+
+/// Compact Orbital symbol: the Paste Shifter mark as a planet, crossed by its
+/// local orbit and accompanied by a small moon. Scales from widget controls to
+/// settings cards without relying on a generic system glyph.
+struct OrbitalMark: View {
+    var size: CGFloat = 24
+    var isActive = true
+
+    private let violet = Color(red: 0.58, green: 0.25, blue: 0.96)
+    private let deepViolet = Color(red: 0.25, green: 0.08, blue: 0.52)
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .stroke(violet.opacity(isActive ? 0.72 : 0.42), lineWidth: max(0.8, size * 0.045))
+                .frame(width: size * 1.06, height: size * 0.43)
+                .rotationEffect(.degrees(-28))
+
+            RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+                .fill(LinearGradient(colors: [violet, deepViolet], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size * 0.64, height: size * 0.64)
+                .overlay {
+                    Image(nsImage: BrandIcon.template)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(.white)
+                        .padding(size * 0.15)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+                        .strokeBorder(.white.opacity(0.25), lineWidth: max(0.6, size * 0.035))
+                }
+                .shadow(color: violet.opacity(isActive ? 0.24 : 0.08), radius: size * 0.14, y: size * 0.04)
+
+            Circle()
+                .fill(isActive ? Color(red: 0.84, green: 0.66, blue: 1) : Color.secondary.opacity(0.7))
+                .frame(width: size * 0.17, height: size * 0.17)
+                .offset(x: size * 0.43, y: -size * 0.24)
+        }
+        .frame(width: size * 1.15, height: size * 1.15)
+        .accessibilityLabel("Orbital de Paste Shifter")
+    }
 }

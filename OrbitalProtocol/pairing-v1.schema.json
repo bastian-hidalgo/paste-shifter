@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pasteshifter:orbital:pairing-v1",
+  "title": "Orbital one-time pairing QR v1",
+  "description": "Ephemeral LAN pairing payload. pairingSecret is shown only in a user-scanned QR and must never be advertised over Bonjour or persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "pairingID",
+    "localDeviceID",
+    "certificateFingerprintSHA256",
+    "pairingSecret",
+    "expiresAtMilliseconds"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "pairingID": { "type": "string", "format": "uuid" },
+    "localDeviceID": { "type": "string", "format": "uuid" },
+    "certificateFingerprintSHA256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "pairingSecret": { "type": "string", "contentEncoding": "base64", "minLength": 44, "maxLength": 44 },
+    "expiresAtMilliseconds": { "type": "integer", "minimum": 0 }
+  }
+}

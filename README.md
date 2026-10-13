@@ -60,9 +60,15 @@ El globo aparece con un fade-in de 180 ms y un crecimiento suave del 96 % al 100
 
 El icono de la barra de menú permite abrir el selector, cambiar de espacio, guardar en Privado, mandar una copia a Fantasma, eliminar la selección, borrar cada historial, pausar, abrir ajustes y salir. Si un atajo ya está reservado, los ajustes muestran el conflicto.
 
+### Orbital
+
+Orbital es la conexión local entre Paste Shifter para Mac y la app Android; no es un modo ni un historial aparte. La app de Mac incluye pairing por QR de un solo uso, aprobación explícita, listener Bonjour y transporte directo TLS 1.3 sobre Wi‑Fi. El clip individual se envía de forma explícita; compartir automáticamente copias nuevas de Normal es opt-in y empieza desactivado. Los clips recibidos se incorporan a Normal sin reemplazar el portapapeles ni volver a emitirse. Fantasma, Flash y Privado quedan excluidos.
+
+La app Android nativa tiene pairing por QR local, conexión directa con pinning TLS y envío manual desde Compartir o desde su cuadro para escribir y pegar. En el Mac, cada clip Normal seleccionado se puede enviar de forma explícita al dispositivo conectado; compartir automáticamente sigue siendo opcional y empieza desactivado. El Android pone las copias recibidas directamente en su portapapeles, marca su vista previa como sensible y muestra una notificación local con sonido si las notificaciones están permitidas. La seguridad depende de validar estrictamente la huella del certificado leída en el QR; el descubrimiento Bonjour por sí solo no establece confianza. El protocolo rechaza clientes no emparejados y prueba cada reconexión con una firma fresca. Esto protege confidencialidad e integridad frente a intermediarios sin las claves confiables, aunque la red todavía puede bloquear o retrasar conexiones. Consulta el [plan de sincronización Mac–Android](PLAN_SYNC_ANDROID_MAC.md), la [app Android](Android/README.md) y la [especificación compartida del protocolo Orbital](OrbitalProtocol/README.md).
+
 ## Recursos y privacidad
 
-- Sin dependencias externas, servidor, red, Electron ni webviews.
+- Sin cuentas, servidores, relays, analítica ni conexión a Internet en tiempo de ejecución. Orbital usa conexión directa en la Wi‑Fi local; la dependencia X.509 de Apple se incorpora durante la compilación. Sin Electron ni webviews.
 - Hasta 60 textos; máximo 256.000 bytes UTF-8 por texto. Solo texto, con sus saltos de línea y espacios originales.
 - Normal y Fantasma viven en memoria y desaparecen al salir. Al activar Fantasma, las copias nuevas van a esa lista oculta en vez de Normal. También puedes mover allí una copia seleccionada desde el menú.
 - Privado solo agrega elementos al pulsar + o «Guardar portapapeles en Privado». Se cifra con AES-GCM; la clave aleatoria se guarda en el llavero de macOS, protegida por autenticación. Se desbloquea con Touch ID o la contraseña de la cuenta de macOS. No es un PIN propio de la app.

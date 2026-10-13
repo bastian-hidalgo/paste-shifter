@@ -1,4 +1,7 @@
 import SwiftUI
+import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 #if canImport(ClipboardCore)
 import ClipboardCore
 #endif
@@ -19,7 +22,9 @@ struct PickerView: View {
     static let width = bubbleWidth + animationPadding * 2
     static let height = bubbleHeight + animationPadding * 2
     @ObservedObject var store: ClipboardStore
+    @ObservedObject var orbital: OrbitalCoordinator
     @ObservedObject var motion: PickerMotion
+    let sendToAndroid: () -> Void
     @Environment(\.colorScheme) private var colorScheme
     @ObservedObject private var clock = PickerClock()
     let paste: (Clip) -> Void
@@ -86,8 +91,15 @@ struct PickerView: View {
                 Image(systemName: "plus").font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary).frame(width: 18, height: 26).help("Guardar el portapapeles en Privado")
             }
-            GhostMark(color: store.space == .ghost ? accent : .secondary, size: 18)
-                .frame(width: 18, height: 26).help("Espacio Fantasma")
+            Button(action: sendToAndroid) {
+                OrbitalMark(size: 23, isActive: canSendHighlightedToAndroid)
+                    .frame(width: 26, height: 26)
+            }
+            .buttonStyle(.plain)
+        .help(orbital.pairedDevices.count == 1
+              ? "Enviar la copia seleccionada a \(orbital.pairedDevices[0].name)"
+              : "Enviar la copia seleccionada a Android por Orbital")
+            .accessibilityLabel("Enviar a Android por Orbital")
         }
         .padding(.horizontal, 8).frame(width: Self.bubbleWidth, height: Self.bubbleHeight)
         .contentShape(Capsule())
@@ -111,6 +123,11 @@ struct PickerView: View {
         .animation(.snappy(duration: 0.16), value: store.highlightedID)
         .onReceive(clock.timer) { clock.now = $0 }
         .accessibilityLabel(store.highlighted.map { "\(Distribution.isAppStore ? "Copiar" : "Pegar"): \($0.compactPreview)" } ?? "Historial vacío")
+    }
+
+    private var canSendHighlightedToAndroid: Bool {
+        guard let clip = store.highlighted else { return false }
+        return orbital.mayManuallyShare(space: store.space, text: clip.text)
     }
 
     private var emptyMessage: String {
@@ -175,6 +192,7 @@ private struct GhostBody: Shape {
 
 struct SettingsView: View {
     @ObservedObject var store: ClipboardStore
+    @ObservedObject var orbital: OrbitalCoordinator
     @ObservedObject var permission: AccessibilityPermission
     @ObservedObject var loginItem: LoginItemSettings
     let shortcutFailures: [String]
@@ -272,6 +290,8 @@ struct SettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.primary.opacity(0.075), lineWidth: 1))
             .shadow(color: Color(red: 0.31, green: 0.22, blue: 0.43).opacity(0.035), radius: 14, x: 0, y: 5)
 
+            orbitalPanel
+
             if Distribution.isAppStore {
                 VStack(alignment: .leading, spacing: 10) {
                     sectionHeading("Cómo pegar")
@@ -350,6 +370,146 @@ struct SettingsView: View {
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var orbitalPanel: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            sectionHeading("Orbital", subtitle: "La conexión local de Paste Shifter entre tus dispositivos.")
+            HStack(alignment: .top, spacing: 10) {
+                OrbitalMark(size: 30)
+                    .frame(width: 38, height: 38)
+                    .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Función central · conexión local directa").font(.system(size: 12, weight: .semibold))
+                    Text(orbital.connectionStatus)
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+
+            Label("Orbital no será un modo aparte: los clips recibidos aparecerán en Normal, listos para pegar. Fantasma, Flash y Privado quedan fuera.", systemImage: "doc.on.clipboard")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Toggle("Pausar Orbital", isOn: $orbital.isPaused)
+                .toggleStyle(.switch).controlSize(.small)
+                .font(.system(size: 11, weight: .medium))
+
+            Toggle("Sonido en el Mac al recibir una copia", isOn: $orbital.receiveSoundEnabled)
+                .toggleStyle(.switch).controlSize(.small)
+                .font(.system(size: 11, weight: .medium))
+
+            Toggle("Avisarme cuando un dispositivo se reconecte", isOn: $orbital.reconnectNotificationsEnabled)
+                .toggleStyle(.switch).controlSize(.small)
+                .font(.system(size: 11, weight: .medium))
+
+            if let qrData = orbital.pairingQRData, let qrImage = pairingQRImage(from: qrData),
+               let expiry = orbital.pairingExpiresAt {
+                HStack(alignment: .top, spacing: 14) {
+                    Image(nsImage: qrImage).interpolation(.none).resizable().scaledToFit()
+                        .frame(width: 190, height: 190).padding(8)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 10))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text("Escanea con Paste Shifter para Android")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("El QR es de un solo uso y vence en")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(expiry, style: .timer)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        Text("Después compara el código de seis dígitos en ambos dispositivos.")
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Cancelar emparejamiento") { orbital.endPairing() }
+                            .controlSize(.small)
+                    }
+                    .padding(.top, 6)
+                    Spacer(minLength: 0)
+                }
+                .padding(11)
+                .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+            } else if orbital.isPreparingPairing {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text("Preparando la conexión segura…")
+                        .font(.system(size: 11, weight: .medium))
+                    Spacer()
+                    Button("Cancelar") { orbital.endPairing() }
+                        .controlSize(.small)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(accent.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            } else if let request = orbital.pendingApproval {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text("¿Autorizar \(request.deviceName)?")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Confirma que el siguiente código coincide con el mostrado en tu Android:")
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                    Text(request.comparisonCode)
+                        .font(.system(size: 24, weight: .bold, design: .monospaced))
+                        .tracking(4)
+                        .accessibilityLabel("Código de comprobación \(request.comparisonCode)")
+                    HStack {
+                        Button("Rechazar") { orbital.rejectPairing() }.controlSize(.small)
+                        Button("Autorizar dispositivo") { orbital.approvePairing() }
+                            .controlSize(.small).keyboardShortcut(.defaultAction)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+            } else {
+                Button {
+                    orbital.beginPairing()
+                } label: {
+                    Label("Añadir dispositivo Android", systemImage: "qrcode")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .controlSize(.small)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Compartir automáticamente copias nuevas de Normal", isOn: $orbital.automaticSharingEnabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.system(size: 11, weight: .medium))
+                    .disabled(orbital.availability != .ready)
+                Text("Desactivado por defecto. También podrás compartir un clip de forma explícita.")
+                    .font(.system(size: 10)).foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !orbital.pairedDevices.isEmpty {
+                Divider()
+                Text("DISPOSITIVOS EMPAREJADOS").font(.system(size: 9, weight: .bold)).tracking(1.0).foregroundStyle(.tertiary)
+                ForEach(orbital.pairedDevices) { device in
+                    HStack {
+                        Label(device.name, systemImage: "dot.radiowaves.left.and.right")
+                            .font(.system(size: 11, weight: .medium))
+                        Spacer()
+                        Button("Revocar") { orbital.revokeDevice(device.id) }
+                            .font(.system(size: 10)).controlSize(.small)
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.primary.opacity(0.075), lineWidth: 1))
+        .shadow(color: Color(red: 0.31, green: 0.22, blue: 0.43).opacity(0.035), radius: 14, x: 0, y: 5)
+    }
+
+    private func pairingQRImage(from payload: Data) -> NSImage? {
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = payload
+        filter.correctionLevel = "M"
+        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
+              let cgImage = CIContext().createCGImage(output, from: output.extent) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: 200, height: 200))
     }
 
     private var settingsSidebar: some View {
@@ -510,8 +670,51 @@ struct SettingsView: View {
 
                 HStack {
                     if let clip = store.highlighted {
-                        Button("Copiar selección") { store.write(clip) }
-                            .buttonStyle(.borderedProminent).tint(accent)
+                        Button {
+                            store.write(clip)
+                        } label: {
+                            Label("Copiar selección", systemImage: "doc.on.doc")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent).tint(accent)
+                        .controlSize(.small).frame(width: 132, height: 25)
+                        let canSendToAndroid = !clip.source.hasPrefix("Orbital ·") &&
+                            orbital.mayManuallyShare(space: store.space, text: clip.text)
+                        if orbital.pairedDevices.count > 1 {
+                            Menu {
+                                ForEach(orbital.pairedDevices) { device in
+                                    Button(device.name) {
+                                        orbital.sendManually(clip.text, from: store.space, to: device.id)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    OrbitalMark(size: 17, isActive: canSendToAndroid)
+                                    Text("Enviar a Android")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .help(canSendToAndroid ? "Elegir un Android conectado" : orbital.connectionStatus)
+                            .buttonStyle(.bordered).controlSize(.small).frame(width: 132, height: 25)
+                            .disabled(!canSendToAndroid)
+                        } else {
+                            Button {
+                                guard canSendToAndroid,
+                                      let device = orbital.pairedDevices.first else { return }
+                                orbital.sendManually(clip.text, from: store.space, to: device.id)
+                            } label: {
+                                HStack(spacing: 6) {
+                                    OrbitalMark(size: 17, isActive: canSendToAndroid)
+                                    Text("Enviar a Android")
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .help(canSendToAndroid
+                                  ? "Enviar esta copia a \(orbital.pairedDevices.first?.name ?? "Android")"
+                                  : orbital.connectionStatus)
+                            .buttonStyle(.bordered).controlSize(.small).frame(width: 132, height: 25)
+                            .disabled(!canSendToAndroid)
+                        }
                     }
                     Spacer()
                     Button(role: .destructive) { store.removeHighlighted() } label: {

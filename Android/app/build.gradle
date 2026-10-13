@@ -1,0 +1,31 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'cl.pasteshifter.orbital'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'cl.pasteshifter.orbital'
+        minSdk 29
+        targetSdk 36
+        versionCode 10
+        versionName '0.4.6'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += [
+            '../orbital-protocol/src/main/java',
+            '../orbital-transport/src/main/java'
+        ]
+    }
+}
+
+dependencies {
+    // Pure local decoder: no Play Services or runtime service/telemetry.
+    implementation 'com.google.zxing:core:3.5.3'
+}
